@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人物關係圖｜Relationship Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #FFFCF6;
+  --ink: #3E3A39;
+  --main: #FDB482;
+  --family: #AFEEEE;
+  --friend: #FFE4E1;
+  --other: #FFFACD;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Merriweather", serif; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.app { min-height: 100vh; }
+.topbar {
+  height: 68px; padding: 0 22px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 2px solid var(--ink); background: var(--paper); gap: 12px;
+}
+.brand { font-size: 18px; font-weight: 700; letter-spacing: -.5px; }
+.brand small { display: block; font-size: 9px; letter-spacing: 2px; margin-top: 4px; font-weight: 400; }
+.top-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.btn {
+  border: 2px solid var(--ink); border-radius: 9px; background: white; padding: 8px 12px;
+  font-size: 11px; box-shadow: 2px 2px 0 var(--ink); transition: transform .12s, box-shadow .12s;
+}
+.btn:active { transform: translate(2px,2px); box-shadow: none; }
+.btn.primary { background: var(--main); }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 258px; min-height: calc(100vh - 68px); }
+.workspace { min-width: 0; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.canvas-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.canvas-head h1 { font-size: 16px; margin: 0; }
+.zoom-controls { display:flex; align-items:center; gap:5px; }
+.zoom-controls .btn { padding:6px 9px; }
+#zoomValue { font-size:10px; min-width:38px; text-align:center; }
+.canvas-head p { font-size: 10px; line-height: 1.7; margin: 5px 0 0; opacity: .72; }
+.status { font-size: 10px; padding: 7px 10px; border: 1.5px solid var(--ink); border-radius: 20px; white-space: nowrap; }
+.canvas-wrap { position: relative; flex: 1; min-height: 560px; overflow: hidden; border: 2px solid var(--ink); border-radius: 14px; background-color: var(--paper); }
+#canvas { display: block; width: 100%; height: 100%; min-height: 560px; touch-action: none; }
+.grid-pattern { position:absolute; inset:0; pointer-events:none; opacity:.18; background-image: radial-gradient(var(--ink) .65px, transparent .65px); background-size: 20px 20px; }
+.canvas-hint { position:absolute; left:14px; bottom:12px; font-size:9px; background:var(--paper); padding:5px 7px; border:1px solid var(--ink); border-radius:6px; pointer-events:none; }
+.sidebar { border-left: 2px solid var(--ink); padding: 18px 16px; background: #FFF8EC; position: sticky; top: 0; height: calc(100vh - 0px); overflow-y: auto; }
+.side-title { font-size: 15px; margin: 2px 0 5px; }
+.side-sub { font-size: 10px; line-height: 1.7; opacity: .75; margin: 0 0 17px; }
+.person-types { display: grid; gap: 9px; }
+.type-card { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fffdf9; border: 1.5px solid var(--ink); border-radius: 10px; padding: 10px; }
+.type-card:hover, .type-card.active { box-shadow: 3px 3px 0 var(--ink); transform: translate(-1px,-1px); }
+.type-card.active { outline: 2px solid var(--ink); outline-offset: 1px; }
+.swatch { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; border: 1.5px solid var(--ink); }
+.type-name { font-size: 11px; display: block; }
+.type-desc { display: block; font-size: 9px; margin-top: 4px; opacity: .65; }
+.side-divider { height: 1px; background: #c8beb0; margin: 18px 0; }
+.field-label { display: block; font-size: 10px; margin: 11px 0 6px; }
+.field { width: 100%; min-width: 0; border: 1.5px solid var(--ink); border-radius: 7px; padding: 9px; background: white; font-size: 11px; outline-offset: 2px; }
+.field:focus { outline: 2px solid #FDB482; }
+.editor-empty { font-size: 10px; line-height: 1.8; opacity: .65; }
+.editor-actions { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.editor-actions .btn { padding: 7px 9px; }
+.btn.danger { background: #fff0ec; }
+.tip { margin-top: 17px; padding: 10px; background: #fffdf9; border: 1px dashed #a79b8b; border-radius: 8px; font-size: 9px; line-height: 1.8; }
+.legend { display:flex; gap:12px; flex-wrap:wrap; font-size:9px; }
+.legend span { display:flex; align-items:center; gap:5px; }
+.legend i { width:9px;height:9px;border:1px solid var(--ink);border-radius:50%;display:inline-block; }
+@media (min-width: 1100px) { .canvas-wrap { min-height: calc(100vh - 155px); } }
+@media (max-width: 760px) {
+  .topbar { height:auto; min-height:64px; padding:12px; align-items:flex-start; }
+  .brand { font-size:14px; }
+  .top-actions .btn { font-size:9px; padding:7px 8px; }
+  .layout { display:flex; flex-direction:column; }
+  .workspace { padding:12px; order:1; }
+  .canvas-wrap, #canvas { min-height: 460px; }
+  .sidebar { position:relative; order:0; height:auto; border-left:0; border-bottom:2px solid var(--ink); padding:14px 12px; }
+  .person-types { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .type-card { padding:8px; }
+  .side-divider { margin:13px 0; }
+  .tip { margin-top:12px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">人物關係圖 <small>RELATIONSHIP MAP STUDIO</small></div>
+    <div class="top-actions">
+      <button class="btn" id="connectMode">↔ 連結人物</button>
+      <button class="btn" id="undoConnect">取消選取</button>
+      <button class="btn" id="saveImage">↓ 匯出 PNG</button>
+      <button class="btn primary" id="saveData">儲存檔案</button>
+      <button class="btn" id="loadData">匯入檔案</button>
+      <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    </div>
+  </header>
+  <div class="layout">
+    <main class="workspace">
+      <div class="canvas-head">
+        <div><h1>關係畫布</h1><p>選擇人物類型新增圓圈，拖曳人物調整位置；點選兩個人物建立雙向關係。</p></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <div class="zoom-controls" aria-label="畫布縮放">
+            <button class="btn" id="zoomOut" title="縮小畫布">−</button>
+            <span id="zoomValue">100%</span>
+            <button class="btn" id="zoomIn" title="放大畫布">＋</button>
+            <button class="btn" id="zoomReset">重設</button>
+          </div>
+          <span class="status" id="countStatus">0 位人物 · 0 組關係</span>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i style="background:#FDB482"></i>主要人物</span>
+        <span><i style="background:#AFEEEE"></i>家人</span>
+        <span><i style="background:#FFE4E1"></i>朋友</span>
+        <span><i style="background:#FFFACD"></i>其他人物</span>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <div class="grid-pattern"></div>
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg" aria-label="人物關係畫布">
+          <defs>
+            <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L6,3 z" fill="#000000"></path>
+            </marker>
+          </defs>
+          <g id="edgesLayer"></g>
+          <g id="nodesLayer"></g>
+        </svg>
+        <div class="canvas-hint">小提示：點人物可編輯；按住圓圈拖動。按住 Ctrl／⌘ 並滾動滑鼠可縮放。</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <h2 class="side-title">人物工具箱</h2>
+      <p class="side-sub">先選一種顏色，再在畫布上新增人物。圓圈可自由移動。</p>
+      <div class="person-types">
+        <button class="type-card" data-type="main"><span class="swatch" style="background:#FDB482"></span><span><span class="type-name">主要人物</span><span class="type-desc">橙色 · 主角／自己</span></span></button>
+        <button class="type-card" data-type="family"><span class="swatch" style="background:#AFEEEE"></span><span><span class="type-name">家人</span><span class="type-desc">藍色 · 家庭成員</span></span></button>
+        <button class="type-card" data-type="friend"><span class="swatch" style="background:#FFE4E1"></span><span><span class="type-name">朋友</span><span class="type-desc">肉色 · 朋友／同伴</span></span></button>
+        <button class="type-card" data-type="other"><span class="swatch" style="background:#FFFACD"></span><span><span class="type-name">其他人物</span><span class="type-desc">黃色 · 其他關係</span></span></button>
+      </div>
+      <div class="side-divider"></div>
+      <h2 class="side-title">人物資料</h2>
+      <div id="editor">
+        <p class="editor-empty">尚未選擇人物。點擊畫布中的圓圈，就能在這裡編輯名字與性別。</p>
+      </div>
+      <div class="tip">✦ <b>如何建立關係</b><br>點「連結人物」或直接依序點選兩個圓圈。系統會畫出兩條相反方向的箭頭，點選關係線上的文字即可編輯關係描述。</div>
+    </aside>
+  </div>
+</div>
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const colors = { main:"#FDB482", family:"#AFEEEE", friend:"#FFE4E1", other:"#FFFACD" };
+  const labels = { main:"主要人物", family:"家人", friend:"朋友", other:"其他人物" };
+  const svg = document.getElementById("canvas");
+  const edgesLayer = document.getElementById("edgesLayer");
+  const nodesLayer = document.getElementById("nodesLayer");
+  const wrap = document.getElementById("canvasWrap");
+  const editor = document.getElementById("editor");
+  const status = document.getElementById("countStatus");
+  let nodes = [], edges = [], selectedId = null, linkFirst = null, activeType = "main";
+  let nextNodeId = 1, nextEdgeId = 1, drag = null, connectMode = false;
+  let zoom = 1, panX = 0, panY = 0, panDrag = null;
+  const zoomLayer = svgEl("g", { id: "zoomLayer" });
+  svg.appendChild(zoomLayer);
+  zoomLayer.append(edgesLayer, nodesLayer);
+
+  function size() {
+    const r = svg.getBoundingClientRect();
+    return { w:r.width, h:r.height };
+  }
+  function pointFromEvent(e) {
+    const r = svg.getBoundingClientRect();
+    return { x: Math.max(48, Math.min(r.width-48, e.clientX-r.left)), y: Math.max(48, Math.min(r.height-48, e.clientY-r.top)) };
+  }
+  function applyZoom() {
+    zoomLayer.setAttribute("transform", `translate(${panX} ${panY}) scale(${zoom})`);
+    document.getElementById("zoomValue").textContent = `${Math.round(zoom * 100)}%`;
+  }
+  function nodeById(id) { return nodes.find(n => n.id === id); }
+  function edgeById(id) { return edges.find(e => e.id === id); }
+  function svgEl(tag, attrs={}) {
+    const el = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([k,v]) => el.setAttribute(k, v));
+    return el;
+  }
+  function escapeText(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+  function updateStatus() {
+    status.textContent = `${nodes.length} 位人物 · ${edges.length} 組關係`;
+  }
+  function draw() {
+    edgesLayer.replaceChildren();
+    nodesLayer.replaceChildren();
+    edges.forEach(edge => {
+      const a = nodeById(edge.a), b = nodeById(edge.b);
+      if (!a || !b) return;
+      const dx=b.x-a.x, dy=b.y-a.y, len=Math.max(1,Math.hypot(dx,dy)), ux=dx/len, uy=dy/len;
+      const r=43, gap=5;
+      const sx=a.x+ux*(r+gap), sy=a.y+uy*(r+gap), tx=b.x-ux*(r+gap), ty=b.y-uy*(r+gap);
+      const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+      const nx=-uy, ny=ux;
+      const offset=11;
+      // Two separate, opposing one-way arrows, visually offset like ⥤ / ⥢.
+      const line1=svgEl("line",{x1:sx+nx*offset,y1:sy+ny*offset,x2:tx+nx*offset,y2:ty+ny*offset,stroke:"#000000","stroke-width":"1.8","marker-end":"url(#arrowHead)"});
+      const line2=svgEl("line",{x1:tx-nx*offset,y1:ty-ny*offset,x2:sx-nx*offset,y2:sy-ny*offset,stroke:"#000000","stroke-width":"1.8","marker-end":"url(#arrowHead)"});
+      edgesLayer.append(line1,line2);
+      const labelStyle="paint-order:stroke;stroke:#FFFCF6;stroke-width:5px;stroke-linejoin:round;cursor:pointer";
+      function addEdgeLabel(text, x, y, direction) {
+        const label=svgEl("text",{x,y,"text-anchor":"middle","dominant-baseline":"middle",fill:"#3E3A39","font-size":"10","font-family":"Merriweather, serif",style:labelStyle});
+        label.textContent=text || "編輯文字";
+        label.addEventListener("pointerdown",e=>e.stopPropagation());
+        label.addEventListener("click",e=>{ e.stopPropagation(); editEdge(edge.id, direction); });
+        edgesLayer.append(label);
+      }
+      addEdgeLabel(edge.labelAB, mx+nx*24, my+ny*24-7, "AB");
+      addEdgeLabel(edge.labelBA, mx-nx*24, my-ny*24+7, "BA");
+    });
+    nodes.forEach(n => {
+      const g=svgEl("g",{transform:`translate(${n.x},${n.y})`,style:"cursor:grab"});
+      const circle=svgEl("circle",{r:43,fill:colors[n.type],stroke:"#3E3A39","stroke-width":selectedId===n.id?"3":"1.8"});
+      if (selectedId===n.id) {
+        circle.setAttribute("stroke-dasharray","4 3");
+      }
+      const name=svgEl("text",{x:0,y:0,"text-anchor":"middle","dominant-baseline":"middle",fill:"#3E3A39","font-size":"11","font-family":"Merriweather, serif","font-weight":"700","pointer-events":"none"});
+      const fullName=n.name || "未命名";
+      // Wrap long names into multiple lines within the circle.
+      const chars = Array.from(fullName);
+      const maxChars = 7;
+      const lines = [];
+      for (let i=0; i<chars.length; i+=maxChars) lines.push(chars.slice(i,i+maxChars).join(""));
+      const visibleLines = lines.slice(0, 5);
+      const lineHeight = 13;
+      visibleLines.forEach((line, i) => {
+        const tspan=svgEl("tspan",{x:0,dy:i===0?`${-((visibleLines.length-1)*lineHeight)/2 - 4}`:String(lineHeight)});
+        tspan.textContent=line;
+        name.append(tspan);
+      });
+      const gender=svgEl("text",{x:0,y:31,"text-anchor":"middle","dominant-baseline":"middle",fill:"#3E3A39","font-size":"8","font-family":"Merriweather, serif","pointer-events":"none"});
+      gender.textContent=n.gender || labels[n.type];
+      g.append(circle,name,gender);
+      g.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation();
+        selectedId=n.id;
+        if (linkFirst !== null && linkFirst !== n.id) {
+          makeEdge(linkFirst,n.id); linkFirst=null; connectMode=false;
+          document.getElementById("connectMode").classList.remove("primary");
+        } else {
+          drag={id:n.id, startX:e.clientX, startY:e.clientY, nodeX:n.x,nodeY:n.y, moved:false};
+        }
+        renderEditor(); draw();
+      });
+      g.addEventListener("click", e => e.stopPropagation());
+      nodesLayer.append(g);
+    });
+    updateStatus();
+  }
+  function renderEditor() {
+    const n=nodeById(selectedId);
+    if (!n) {
+      editor.innerHTML='<p class="editor-empty">尚未選擇人物。點擊畫布中的圓圈，就能在這裡編輯名字與性別。</p>';
+      return;
+    }
+    editor.innerHTML=`
+      <label class="field-label" for="personName">名字</label>
+      <input class="field" id="personName" maxlength="60" placeholder="輸入人物名字" value="${escapeText(n.name)}">
+      <label class="field-label" for="personGender">性別</label>
+      <select class="field" id="personGender">
+        <option value="" ${!n.gender?"selected":""}>未設定</option>
+        <option ${n.gender==="女"?"selected":""}>女</option>
+        <option ${n.gender==="男"?"selected":""}>男</option>
+        <option ${n.gender==="非二元"?"selected":""}>非二元</option>
+        <option ${n.gender==="其他／自訂"?"selected":""}>其他／自訂</option>
+        <option ${n.gender==="不公開"?"selected":""}>不公開</option>
+      </select>
+      <label class="field-label" for="personType">人物分類</label>
+      <select class="field" id="personType">
+        ${Object.keys(labels).map(k=>`<option value="${k}" ${n.type===k?"selected":""}>${labels[k]}</option>`).join("")}
+      </select>
+      <div class="editor-actions">
+        <button class="btn danger" id="deletePerson">刪除人物</button>
+        <button class="btn" id="startLink">選擇另一人連結</button>
+      </div>`;
+    document.getElementById("personName").addEventListener("input",e=>{n.name=e.target.value;draw();});
+    document.getElementById("personGender").addEventListener("change",e=>{n.gender=e.target.value;draw();});
+    document.getElementById("personType").addEventListener("change",e=>{n.type=e.target.value;draw();});
+    document.getElementById("deletePerson").addEventListener("click",()=>{
+      nodes=nodes.filter(x=>x.id!==n.id); edges=edges.filter(x=>x.a!==n.id&&x.b!==n.id);
+      selectedId=null; if(linkFirst===n.id)linkFirst=null; renderEditor();draw();
+    });
+    document.getElementById("startLink").addEventListener("click",()=>{
+      linkFirst=n.id; connectMode=true; document.getElementById("connectMode").classList.add("primary");
+      editor.querySelector(".editor-empty")?.remove();
+      const note=document.createElement("p"); note.className="editor-empty"; note.textContent="已選擇此人物，請再點選畫布中的另一個人物。"; editor.append(note);
+    });
+  }
+  function makeEdge(a,b) {
+    if(a===b)return;
+    let edge=edges.find(e=>(e.a===a&&e.b===b)||(e.a===b&&e.b===a));
+    if(!edge){ edge={id:nextEdgeId++,a,b,labelAB:"",labelBA:""}; edges.push(edge); }
+    draw();
+  }
+  function editEdge(id, direction) {
+    const e=edgeById(id); if(!e)return;
+    const a=nodeById(e.a),b=nodeById(e.b);
+    const isAB = direction === "AB";
+    const from = isAB ? a : b, to = isAB ? b : a;
+    const key = isAB ? "labelAB" : "labelBA";
+    const current = e[key] || "";
+    const value=prompt(`編輯「${from?.name||"未命名"}」→「${to?.name||"未命名"}」的關係文字：`, current);
+    if(value!==null){e[key]=value.trim();draw();}
+  }
+  document.querySelectorAll(".type-card").forEach(btn=>btn.addEventListener("click",()=>{
+    activeType=btn.dataset.type;
+    document.querySelectorAll(".type-card").forEach(b=>b.classList.toggle("active",b===btn));
+    const s=size();
+    const offset=(nodes.length%5)*18;
+    const n={id:nextNodeId++,type:activeType,name:"",gender:"",x:Math.max(55,s.w/2+offset-36),y:Math.max(55,s.h/2+offset-20)};
+    nodes.push(n);selectedId=n.id;linkFirst=null;renderEditor();draw();
+    document.getElementById("personName").focus();
+  }));
+  document.getElementById("connectMode").addEventListener("click",()=>{
+    connectMode=!connectMode; linkFirst=null;
+    document.getElementById("connectMode").classList.toggle("primary",connectMode);
+    if(connectMode) { editor.querySelector(".editor-empty")?.remove(); const p=document.createElement("p");p.className="editor-empty";p.textContent="連結模式已開啟：依序點選兩個人物。";editor.append(p); }
+  });
+  document.getElementById("undoConnect").addEventListener("click",()=>{
+    linkFirst=null;connectMode=false;document.getElementById("connectMode").classList.remove("primary");draw();renderEditor();
+  });
+  svg.addEventListener("pointerdown",e=>{
+    if(e.target===svg || e.target.closest("#edgesLayer")) {
+      if(e.target===svg){selectedId=null;linkFirst=null;renderEditor();draw();}
+    }
+  });
+  window.addEventListener("pointermove",e=>{
+    if(!drag)return;
+    const n=nodeById(drag.id);if(!n)return;
+    const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
+    if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;
+    if(drag.moved){
+      const s=size();n.x=Math.max(45,Math.min(s.w-45,drag.nodeX+dx));n.y=Math.max(45,Math.min(s.h-45,drag.nodeY+dy));draw();
+    }
+  });
+  window.addEventListener("pointerup",()=>{drag=null;});
+  function setZoom(next, clientX, clientY) {
+    const old = zoom;
+    zoom = Math.max(0.45, Math.min(2.2, next));
+    if (clientX != null && clientY != null) {
+      const r = svg.getBoundingClientRect();
+      const px = clientX-r.left, py = clientY-r.top;
+      panX = px - (px-panX) * (zoom/old);
+      panY = py - (py-panY) * (zoom/old);
+    }
+    applyZoom();
+  }
+  document.getElementById("zoomIn").addEventListener("click",()=>setZoom(zoom+0.1));
+  document.getElementById("zoomOut").addEventListener("click",()=>setZoom(zoom-0.1));
+  document.getElementById("zoomReset").addEventListener("click",()=>{zoom=1;panX=0;panY=0;applyZoom();});
+  svg.addEventListener("wheel", e => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(zoom + (e.deltaY < 0 ? 0.08 : -0.08), e.clientX, e.clientY);
+  }, {passive:false});
+
+  document.getElementById("saveData").addEventListener("click",()=>{
+    const data={version:1,nodes,edges,nextNodeId,nextEdgeId,zoom,panX,panY};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="人物關係圖.json";a.click();URL.revokeObjectURL(url);
+  });
+  document.getElementById("loadData").addEventListener("click",()=>document.getElementById("fileInput").click());
+  document.getElementById("fileInput").addEventListener("change",async e=>{
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const d=JSON.parse(await file.text());
+      if(!Array.isArray(d.nodes)||!Array.isArray(d.edges))throw new Error("invalid");
+      nodes=d.nodes;edges=d.edges;nextNodeId=d.nextNodeId||Math.max(0,...nodes.map(n=>n.id))+1;nextEdgeId=d.nextEdgeId||Math.max(0,...edges.map(e=>e.id))+1;
+      zoom = Math.max(0.45,Math.min(2.2,d.zoom||1)); panX=d.panX||0; panY=d.panY||0; applyZoom();
+      selectedId=null;linkFirst=null;renderEditor();draw();
+    }catch(err){alert("無法讀取這個檔案，請選擇先前匯出的 JSON 檔。");}
+    e.target.value="";
+  });
+  document.getElementById("saveImage").addEventListener("click",()=>{
+    const clone=svg.cloneNode(true);
+    clone.setAttribute("xmlns",NS);
+    const rect=svg.getBoundingClientRect();clone.setAttribute("width",rect.width);clone.setAttribute("height",rect.height);
+    const xml=new XMLSerializer().serializeToString(clone);
+    const blob=new Blob([xml],{type:"image/svg+xml;charset=utf-8"});const url=URL.createObjectURL(blob);
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas");c.width=rect.width*2;c.height=rect.height*2;
+      const ctx=c.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#FFFCF6";ctx.fillRect(0,0,rect.width,rect.height);ctx.drawImage(img,0,0,rect.width,rect.height);
+      URL.revokeObjectURL(url);const a=document.createElement("a");a.download="人物關係圖.png";a.href=c.toDataURL("image/png");a.click();
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);alert("匯出圖片失敗，請稍後再試。");};
+    img.src=url;
+  });
+  document.querySelector('[data-type="main"]').classList.add("active");
+  applyZoom();
+  draw();
+})();
+</script>
+</body>
+</html>
